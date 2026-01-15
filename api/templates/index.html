@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bibliotheca — Library Management System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+
+<!-- ░░ HEADER ░░ -->
+<header class="site-header">
+    <div class="header-inner">
+        <div class="logo">
+            <span class="logo-icon">⟁</span>
+            <span class="logo-text">Bibliotheca</span>
+        </div>
+        <nav class="tabs" id="mainTabs">
+            <button class="tab active" data-target="catalogue">Catalogue</button>
+            <button class="tab" data-target="borrow">Borrow</button>
+            <button class="tab" data-target="return">Return</button>
+            <button class="tab" data-target="transactions">Transactions</button>
+            <button class="tab" data-target="report">Report</button>
+            <button class="tab" data-target="manage">Manage</button>
+        </nav>
+    </div>
+</header>
+
+<!-- ░░ TOAST ░░ -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ░░ MAIN ░░ -->
+<main class="main-content">
+
+    <!-- ── CATALOGUE ── -->
+    <section id="catalogue" class="panel active">
+        <div class="panel-head">
+            <h1 class="panel-title">Book Catalogue</h1>
+            <div class="panel-actions">
+                <label class="toggle-wrap">
+                    <input type="checkbox" id="availableOnly" />
+                    <span class="toggle-track"></span>
+                    <span class="toggle-label">Available only</span>
+                </label>
+                <div class="search-box">
+                    <input type="text" id="catalogueSearch" placeholder="Search title, author, genre…" />
+                </div>
+            </div>
+        </div>
+        <div id="bookGrid" class="book-grid">
+            <!-- Populated by JS -->
+        </div>
+    </section>
+
+    <!-- ── BORROW ── -->
+    <section id="borrow" class="panel">
+        <div class="panel-head">
+            <h1 class="panel-title">Borrow a Book</h1>
+        </div>
+        <div class="form-card">
+            <div class="form-grid">
+                <div class="field">
+                    <label>Book ID <span class="note">(case-insensitive)</span></label>
+                    <input type="text" id="borrowBookId" placeholder="e.g. LIB003" />
+                </div>
+                <div class="field">
+                    <label>Borrower Name</label>
+                    <input type="text" id="borrowerName" placeholder="Full name" />
+                </div>
+                <div class="field">
+                    <label>Borrower ID / Roll No.</label>
+                    <input type="text" id="borrowerId" placeholder="e.g. STU2024001" />
+                </div>
+            </div>
+            <div class="borrow-info">
+                <span class="info-chip">📅 14-day lending period</span>
+                <span class="info-chip">💸 ₹5/day overdue fine</span>
+            </div>
+            <button class="btn btn-primary" id="borrowBtn">Issue Book</button>
+
+            <!-- Available books quick-pick -->
+            <div class="quick-section">
+                <p class="quick-label">Available Books</p>
+                <div id="quickAvailList" class="quick-list"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── RETURN ── -->
+    <section id="return" class="panel">
+        <div class="panel-head">
+            <h1 class="panel-title">Return a Book</h1>
+        </div>
+        <div class="form-card">
+            <div class="form-grid">
+                <div class="field">
+                    <label>Borrower Name <span class="note">(name-based lookup)</span></label>
+                    <input type="text" id="returnName" placeholder="Full name as registered" />
+                </div>
+                <div class="field" id="returnTitleField" style="display:none">
+                    <label>Book Title <span class="note">(required if borrowing multiple)</span></label>
+                    <input type="text" id="returnBookTitle" placeholder="Exact book title" />
+                </div>
+                <div class="field">
+                    <label>Book Condition</label>
+                    <div class="condition-group">
+                        <label class="cond-opt">
+                            <input type="radio" name="condition" value="good" checked />
+                            <span class="cond-badge good">Good</span>
+                        </label>
+                        <label class="cond-opt">
+                            <input type="radio" name="condition" value="damaged" />
+                            <span class="cond-badge damaged">Damaged (+₹150)</span>
+                        </label>
+                        <label class="cond-opt">
+                            <input type="radio" name="condition" value="lost" />
+                            <span class="cond-badge lost">Lost (2× price)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="check-fine-row">
+                <button class="btn btn-outline" id="checkFineBtn">Preview Fine</button>
+                <div id="finePreview" class="fine-preview hidden"></div>
+            </div>
+            <button class="btn btn-primary" id="returnBtn">Return Book</button>
+        </div>
+    </section>
+
+    <!-- ── TRANSACTIONS ── -->
+    <section id="transactions" class="panel">
+        <div class="panel-head">
+            <h1 class="panel-title">Transactions</h1>
+            <div class="filter-tabs" id="txnFilters">
+                <button class="ftab active" data-status="">All</button>
+                <button class="ftab" data-status="borrowed">Borrowed</button>
+                <button class="ftab" data-status="returned">Returned</button>
+                <button class="ftab" data-status="damaged">Damaged</button>
+                <button class="ftab" data-status="lost">Lost</button>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table" id="txnTable">
+                <thead>
+                    <tr>
+                        <th>Txn ID</th>
+                        <th>Book</th>
+                        <th>Borrower</th>
+                        <th>Borrow Date</th>
+                        <th>Due Date</th>
+                        <th>Return Date</th>
+                        <th>Status</th>
+                        <th>Fine</th>
+                        <th>Penalty</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody id="txnBody">
+                    <!-- Populated by JS -->
+                </tbody>
+            </table>
+            <p id="txnEmpty" class="empty-msg hidden">No transactions found.</p>
+        </div>
+    </section>
+
+    <!-- ── REPORT ── -->
+    <section id="report" class="panel">
+        <div class="panel-head">
+            <h1 class="panel-title">Financial Report</h1>
+            <button class="btn btn-outline" id="refreshReport">↻ Refresh</button>
+        </div>
+        <div id="reportCards" class="report-grid">
+            <!-- Populated by JS -->
+        </div>
+        <h2 class="section-sub">Overdue Books</h2>
+        <div class="table-wrap">
+            <table class="data-table" id="overdueTable">
+                <thead>
+                    <tr>
+                        <th>Book</th>
+                        <th>Borrower</th>
+                        <th>Due Date</th>
+                        <th>Days Overdue</th>
+                        <th>Accrued Fine</th>
+                    </tr>
+                </thead>
+                <tbody id="overdueBody"></tbody>
+            </table>
+            <p id="overdueEmpty" class="empty-msg hidden">No overdue books. All clear! ✓</p>
+        </div>
+    </section>
+
+    <!-- ── MANAGE ── -->
+    <section id="manage" class="panel">
+        <div class="panel-head">
+            <h1 class="panel-title">Manage Catalogue</h1>
+        </div>
+        <div class="form-card">
+            <h2 class="form-subtitle">Add New Book</h2>
+            <div class="form-grid five-col">
+                <div class="field">
+                    <label>Book ID</label>
+                    <input type="text" id="newBookId" placeholder="e.g. LIB009" />
+                </div>
+                <div class="field">
+                    <label>Title</label>
+                    <input type="text" id="newTitle" placeholder="Book title" />
+                </div>
+                <div class="field">
+                    <label>Author</label>
+                    <input type="text" id="newAuthor" placeholder="Author name" />
+                </div>
+                <div class="field">
+                    <label>Genre</label>
+                    <input type="text" id="newGenre" placeholder="Genre" />
+                </div>
+                <div class="field">
+                    <label>Price (₹)</label>
+                    <input type="number" id="newPrice" placeholder="500" min="0" />
+                </div>
+            </div>
+            <button class="btn btn-primary" id="addBookBtn">Add to Catalogue</button>
+        </div>
+
+        <div class="manage-list-head">
+            <h2 class="form-subtitle">Current Catalogue</h2>
+        </div>
+        <div class="table-wrap">
+            <table class="data-table" id="manageTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Genre</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="manageBody"></tbody>
+            </table>
+        </div>
+    </section>
+
+</main>
+
+<footer class="site-footer">
+    <span>Bibliotheca — Library Management System</span>
+    <span class="footer-sep">·</span>
+    <span>Built with Python & Flask</span>
+</footer>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
