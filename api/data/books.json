@@ -1,0 +1,90 @@
+[
+    {
+        "book_id": "LIB001",
+        "title": "The Pragmatic Programmer",
+        "author": "Andrew Hunt & David Thomas",
+        "genre": "Technology",
+        "price": 850.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    },
+    {
+        "book_id": "LIB002",
+        "title": "Clean Code",
+        "author": "Robert C. Martin",
+        "genre": "Technology",
+        "price": 700.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    },
+    {
+        "book_id": "LIB003",
+        "title": "The Great Gatsby",
+        "author": "F. Scott Fitzgerald",
+        "genre": "Classic Fiction",
+        "price": 350.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    },
+    {
+        "book_id": "LIB004",
+        "title": "Sapiens",
+        "author": "Yuval Noah Harari",
+        "genre": "Non-Fiction",
+        "price": 550.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    },
+    {
+        "book_id": "LIB005",
+        "title": "Design Patterns",
+        "author": "Gang of Four",
+        "genre": "Technology",
+        "price": 950.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    },
+    {
+        "book_id": "LIB006",
+        "title": "Atomic Habits",
+        "author": "James Clear",
+        "genre": "Self-Help",
+        "price": 450.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    },
+    {
+        "book_id": "LIB007",
+        "title": "1984",
+        "author": "George Orwell",
+        "genre": "Dystopian Fiction",
+        "price": 300.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    },
+    {
+        "book_id": "LIB008",
+        "title": "Introduction to Algorithms",
+        "author": "Cormen, Leiserson, Rivest & Stein",
+        "genre": "Technology",
+        "price": 1200.0,
+        "is_available": true,
+        "borrowed_by": null,
+        "due_date": null,
+        "added_on": "2024-01-01"
+    }
+]
