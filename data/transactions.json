@@ -1,0 +1,16 @@
+[
+    {
+        "txn_id": "TXN20260526064358",
+        "book_id": "LIB001",
+        "book_title": "The Pragmatic Programmer",
+        "borrower_name": "Rahul Sharma",
+        "borrower_id": "STU001",
+        "borrow_date": "2026-05-26",
+        "due_date": "2026-06-09",
+        "return_date": "2026-05-26",
+        "status": "returned",
+        "fine": 0.0,
+        "penalty": 0.0,
+        "total_charged": 0.0
+    }
+]
