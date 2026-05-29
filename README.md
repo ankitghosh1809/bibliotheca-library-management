@@ -140,3 +140,6 @@ The system ships with 8 sample books across Technology, Fiction, and Self-Help g
 ## License
 
 MIT License. Free to use, modify, and distribute.
+
+## 🌐 Live Demo
+[https://bibliotheca-library-management.vercel.app](https://bibliotheca-library-management.vercel.app)
