@@ -3,13 +3,14 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 """
 Library Management System - Backend
-Author: Your Name
 Description: A full-featured library management system with fine calculation,
              damage/loss penalties, due date tracking, and financial reporting.
 """
 
 import json
+import shutil
 import os
+from typing import Optional
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
@@ -26,9 +27,35 @@ FINE_PER_DAY        = 5.0         # ₹5 per overdue day
 DAMAGE_PENALTY      = 150.0       # Flat fee for returning a damaged book
 LOSS_PENALTY_MULT   = 2.0         # Multiplier on book price for lost books
 
-DATA_DIR            = os.path.join(os.path.dirname(__file__), "data")
-BOOKS_FILE          = os.path.join(DATA_DIR, "books.json")
-TRANSACTIONS_FILE   = os.path.join(DATA_DIR, "transactions.json")
+# Deploy-time read-only seed data (shipped with the repo)
+SEED_DIR   = os.path.join(os.path.dirname(__file__), "data")
+
+# Runtime writable directory — /tmp is always writable on Vercel/Lambda
+TMP_DATA_DIR       = "/tmp/library_data"
+BOOKS_FILE         = os.path.join(TMP_DATA_DIR, "books.json")
+TRANSACTIONS_FILE  = os.path.join(TMP_DATA_DIR, "transactions.json")
+
+
+def _init_data():
+    """
+    On first cold start, copy seed data from the read-only deploy directory
+    into /tmp so we have a writable working copy.
+    """
+    os.makedirs(TMP_DATA_DIR, exist_ok=True)
+    for fname in ("books.json", "transactions.json"):
+        dest = os.path.join(TMP_DATA_DIR, fname)
+        if not os.path.exists(dest):
+            src = os.path.join(SEED_DIR, fname)
+            if os.path.exists(src):
+                shutil.copy2(src, dest)
+            else:
+                # Create empty fallback
+                with open(dest, "w") as f:
+                    json.dump([], f)
+
+
+# Run once at import time (cold start)
+_init_data()
 
 
 # ──────────────────────────────────────────────
@@ -53,7 +80,7 @@ def save_json(path: str, data: list) -> None:
 #  Helpers: Business Logic
 # ──────────────────────────────────────────────
 
-def find_book_by_id(book_id: str, books: list) -> dict | None:
+def find_book_by_id(book_id: str, books: list) -> Optional[dict]:
     """Return a book dict matching book_id (case-insensitive)."""
     target = book_id.strip().upper()
     for book in books:
@@ -62,7 +89,7 @@ def find_book_by_id(book_id: str, books: list) -> dict | None:
     return None
 
 
-def find_book_by_title(title: str, books: list) -> dict | None:
+def find_book_by_title(title: str, books: list) -> Optional[dict]:
     """Return a book dict matching title (case-insensitive)."""
     target = title.strip().lower()
     for book in books:
@@ -131,7 +158,6 @@ def add_book():
 
     books = load_json(BOOKS_FILE)
 
-    # Duplicate ID check (case-insensitive)
     if find_book_by_id(payload["book_id"], books):
         return jsonify({"success": False, "message": "A book with this ID already exists."}), 409
 
@@ -174,10 +200,6 @@ def delete_book(book_id: str):
 
 @app.route("/api/borrow", methods=["POST"])
 def borrow_book():
-    """
-    Borrow a book.
-    Expects: { "book_id": "...", "borrower_name": "...", "borrower_id": "..." }
-    """
     payload = request.get_json()
     if not payload:
         return jsonify({"success": False, "message": "No data provided."}), 400
@@ -200,13 +222,11 @@ def borrow_book():
     borrow_date = datetime.now().date()
     due_date    = borrow_date + timedelta(days=BORROW_PERIOD_DAYS)
 
-    # Update book record
     book["is_available"] = False
     book["borrowed_by"]  = {"name": borrower_name, "id": borrower_id}
     book["due_date"]     = due_date.strftime("%Y-%m-%d")
     save_json(BOOKS_FILE, books)
 
-    # Create transaction
     transaction = {
         "txn_id":        f"TXN{datetime.now().strftime('%Y%m%d%H%M%S')}",
         "book_id":       book["book_id"],
@@ -216,7 +236,7 @@ def borrow_book():
         "borrow_date":   borrow_date.strftime("%Y-%m-%d"),
         "due_date":      due_date.strftime("%Y-%m-%d"),
         "return_date":   None,
-        "status":        "borrowed",     # borrowed | returned | damaged | lost
+        "status":        "borrowed",
         "fine":          0.0,
         "penalty":       0.0,
         "total_charged": 0.0,
@@ -242,11 +262,6 @@ def borrow_book():
 
 @app.route("/api/return", methods=["POST"])
 def return_book():
-    """
-    Return a book by borrower name (case-insensitive).
-    Expects: { "borrower_name": "...", "condition": "good|damaged|lost" }
-    Optionally: { "book_title": "..." } if user has multiple borrowed books.
-    """
     payload = request.get_json()
     if not payload:
         return jsonify({"success": False, "message": "No data provided."}), 400
@@ -263,7 +278,6 @@ def return_book():
     books        = load_json(BOOKS_FILE)
     transactions = load_json(TRANSACTIONS_FILE)
 
-    # Find open transaction for this borrower (name-based, case-insensitive)
     open_txns = [
         t for t in transactions
         if t["borrower_name"].lower() == borrower_name.lower()
@@ -273,7 +287,6 @@ def return_book():
     if not open_txns:
         return jsonify({"success": False, "message": "No active borrowing found for this person."}), 404
 
-    # If multiple books borrowed, require book title
     if len(open_txns) > 1 and not book_title:
         titles = [t["book_title"] for t in open_txns]
         return jsonify({
@@ -282,7 +295,6 @@ def return_book():
             "borrowed_books": titles,
         }), 400
 
-    # Pick the right transaction
     if book_title:
         txn = next(
             (t for t in open_txns if t["book_title"].lower() == book_title.lower()),
@@ -297,7 +309,6 @@ def return_book():
     if not book:
         return jsonify({"success": False, "message": "Associated book record not found."}), 500
 
-    # ── Calculate charges ──
     fine    = 0.0
     penalty = 0.0
 
@@ -308,13 +319,12 @@ def return_book():
         fine    = calculate_fine(txn["due_date"])
         penalty = DAMAGE_PENALTY
         status  = "damaged"
-    else:  # lost
+    else:
         penalty = calculate_loss_penalty(book["price"])
         status  = "lost"
 
     total_charged = round(fine + penalty, 2)
 
-    # Update transaction
     txn["return_date"]   = datetime.now().strftime("%Y-%m-%d")
     txn["status"]        = status
     txn["fine"]          = fine
@@ -322,7 +332,6 @@ def return_book():
     txn["total_charged"] = total_charged
     save_json(TRANSACTIONS_FILE, transactions)
 
-    # Update book availability
     book["is_available"] = True
     book["borrowed_by"]  = None
     book["due_date"]     = None
@@ -349,7 +358,6 @@ def return_book():
 
 @app.route("/api/transactions", methods=["GET"])
 def get_transactions():
-    """Return all transactions, optionally filtered by status."""
     status = request.args.get("status", "").lower()
     transactions = load_json(TRANSACTIONS_FILE)
     if status:
@@ -359,21 +367,17 @@ def get_transactions():
 
 @app.route("/api/report", methods=["GET"])
 def get_financial_report():
-    """
-    Generate a financial summary report.
-    Includes total revenue, fine collections, penalties, and active borrows.
-    """
     transactions = load_json(TRANSACTIONS_FILE)
     books        = load_json(BOOKS_FILE)
 
-    total_revenue       = sum(t["total_charged"] for t in transactions)
-    total_fines         = sum(t["fine"] for t in transactions)
-    total_penalties     = sum(t["penalty"] for t in transactions)
-    total_borrowed      = len([t for t in transactions if t["status"] == "borrowed"])
-    total_returned      = len([t for t in transactions if t["status"] == "returned"])
-    total_damaged       = len([t for t in transactions if t["status"] == "damaged"])
-    total_lost          = len([t for t in transactions if t["status"] == "lost"])
-    overdue_books       = []
+    total_revenue   = sum(t["total_charged"] for t in transactions)
+    total_fines     = sum(t["fine"] for t in transactions)
+    total_penalties = sum(t["penalty"] for t in transactions)
+    total_borrowed  = len([t for t in transactions if t["status"] == "borrowed"])
+    total_returned  = len([t for t in transactions if t["status"] == "returned"])
+    total_damaged   = len([t for t in transactions if t["status"] == "damaged"])
+    total_lost      = len([t for t in transactions if t["status"] == "lost"])
+    overdue_books   = []
 
     today = datetime.now().date()
     for t in transactions:
@@ -393,13 +397,13 @@ def get_financial_report():
         "success": True,
         "data": {
             "summary": {
-                "total_books":       len(books),
-                "available_books":   len([b for b in books if b["is_available"]]),
-                "borrowed_books":    total_borrowed,
+                "total_books":        len(books),
+                "available_books":    len([b for b in books if b["is_available"]]),
+                "borrowed_books":     total_borrowed,
                 "total_transactions": len(transactions),
-                "total_returned":    total_returned,
-                "total_damaged":     total_damaged,
-                "total_lost":        total_lost,
+                "total_returned":     total_returned,
+                "total_damaged":      total_damaged,
+                "total_lost":         total_lost,
             },
             "financials": {
                 "total_revenue":   round(total_revenue, 2),
@@ -415,7 +419,6 @@ def get_financial_report():
 
 @app.route("/api/check-fine", methods=["GET"])
 def check_fine():
-    """Preview the fine for a currently borrowed book without returning it."""
     borrower_name = request.args.get("borrower_name", "").strip()
     if not borrower_name:
         return jsonify({"success": False, "message": "borrower_name is required."}), 400
@@ -443,10 +446,5 @@ def check_fine():
     return jsonify({"success": True, "data": result}), 200
 
 
-# ──────────────────────────────────────────────
-#  Entry Point
-# ──────────────────────────────────────────────
-
 if __name__ == "__main__":
-    os.makedirs(DATA_DIR, exist_ok=True)
     app.run(debug=True, port=5000)
